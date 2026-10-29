@@ -3,7 +3,8 @@
 //! - [`der`], [`x509`], [`cms`], [`pkcs12`], [`keys`]: the cryptographic formats, on RustCrypto
 //!   primitives (RSA private-key operations use aws-lc-rs on native targets, ADR-0009).
 //! - [`pdf`]: signature fields in a document — listing and validating them, and signing
-//!   (PAdES B-B, `ETSI.CAdES.detached`) with an incremental save.
+//!   (PAdES B-B, `ETSI.CAdES.detached`) with an incremental save, and clearing a signature as
+//!   its signer.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
@@ -28,8 +29,8 @@ pub use der::Time;
 pub use graphic::Graphic;
 pub use keys::{DigestAlg, PrivateKey, PublicKey};
 pub use pdf::{
-    Appearance, AppearanceLabels, Detail, DigestCache, Fill, Modification, SignOptions, SignatureInfo, Status, TrustStore, WORDINGS, Words,
-    in_english, kind, list as signatures, sign, sign_with_timestamp, timestamp_document, validate,
+    Appearance, AppearanceLabels, Cleared, Detail, DigestCache, Fill, Modification, SignOptions, SignatureInfo, Status, TrustStore, WORDINGS, Words,
+    clear as clear_signature, in_english, kind, list as signatures, sign, sign_with_timestamp, timestamp_document, validate,
 };
 pub use pkcs12::DigitalId;
 pub use timestamp::{TimestampAuthority, TimestampQuery, TimestampToken};

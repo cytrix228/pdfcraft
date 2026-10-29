@@ -28,6 +28,16 @@ for s in signatures(&doc, &bytes, &trust) {                                // li
   `/Matrix`; an existing field follows its own `/MK /R`. The document is written incrementally
   with a zero-filled `/Contents` and fixed-width `/ByteRange`, which are then patched in
   place. Encrypted documents are refused for now.
+- **Clearing (Acrobat: Clear Signature):** `clear_signature` takes one signature out, for its
+  signer only: the digital ID must sign a fresh challenge that the signature's certificate
+  verifies (a `.p12` opens only with its password; a copy of the certificate with another key is
+  refused). The file is cut back to the revision before the signature and everything changed since
+  is written again as one incremental update, so no byte of the signature is left and earlier
+  signatures keep their signed bytes; with nothing else changed, the file comes back as it was
+  before signing, byte for byte. A field signing added goes with it, an existing one stays empty
+  with its earlier appearance, and its DocMDP certification and `/DSS /VRI` entry go too. A
+  signature that a later one (or a document timestamp) covers is refused until that one is
+  cleared. This keeps users from clearing someone else's signature by mistake; it is not a lock.
 - **Timestamps (PAdES B-T):** the `timestamp` module builds and parses RFC 3161 requests,
   responses and TSTInfo tokens (size-capped, imprint- and signature-checked). `sign_with_timestamp`
   attaches the TSA's token as an unsigned attribute over the signature value; the transport is

@@ -6079,6 +6079,41 @@ fn digital_ids_signing_and_validation_through_tools() {
     verify_signature_revisions_and_bundle(&mut a, doc, &dir);
 }
 
+/// `sign_clear` clears a signature only for its signer: the password has to open the digital ID,
+/// and the ID has to be the one that signed. A file signed and cleared again is the file as it was.
+#[test]
+fn a_signature_is_cleared_only_by_its_signer_with_the_ids_password() {
+    let dir = workdir("clearing");
+    let mut a = auto(&dir);
+    create_signing_identity(&mut a);
+    ok(&mut a, "sign_id_create", json!({ "name": "Grace Hopper", "key": "p256", "password": "secret34", "path": "grace.p12" }));
+    let original = std::fs::read(dir.join("a.pdf")).unwrap();
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    ok(
+        &mut a,
+        "sign_document",
+        json!({ "doc": doc, "id": "ada.p12", "password": "secret12", "page": 1, "rect": [20, 200, 180, 250], "out": "signed.pdf" }),
+    );
+    let field = ok(&mut a, "sign_list", json!({ "doc": doc }))["signatures"][0]["field"].as_str().unwrap().to_string();
+    let clear = |id: &str, password: &str| json!({ "doc": doc, "field": field, "id": id, "password": password, "out": "cleared.pdf" });
+
+    let wrong_password = a.call("sign_clear", &clear("ada.p12", "wrong!"));
+    assert!(matches!(&wrong_password, Err(ToolError::InvalidArgs(m)) if m.contains("password is incorrect")), "{wrong_password:?}");
+    let someone_else = a.call("sign_clear", &clear("grace.p12", "secret34"));
+    assert!(matches!(&someone_else, Err(ToolError::Failed(m)) if m.contains("only its signer")), "{someone_else:?}");
+    assert!(!dir.join("cleared.pdf").exists(), "a refusal writes nothing");
+    assert_eq!(ok(&mut a, "sign_list", json!({ "doc": doc }))["signed"], 1);
+
+    // The signer's own ID and password: the file is the original again, and the document shows it.
+    let r = ok(&mut a, "sign_clear", clear("ada.p12", "secret12"));
+    assert_eq!((r["field_removed"].as_bool(), r["restored"].as_bool(), r["signed"].as_u64()), (Some(true), Some(true), Some(0)), "{r}");
+    assert!(std::fs::read(dir.join("cleared.pdf")).unwrap() == original, "the file as it was before signing");
+    assert_eq!(ok(&mut a, "sign_list", json!({ "doc": doc }))["count"], 0);
+    let again = a.call("sign_clear", &clear("ada.p12", "secret12"));
+    assert!(matches!(&again, Err(ToolError::Failed(m)) if m.contains("no signature field")), "{again:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 fn create_signing_identity(a: &mut Automation) {
     let id = ok(
         a,

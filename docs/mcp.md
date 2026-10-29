@@ -80,8 +80,8 @@ config works across the suite) keep the agent to the folders you give it:
   `page_extract`, `doc_combine`, `doc_create_multiple`, `doc_split`, `doc_reduce`, `doc_optimize`,
   `doc_print` to a file, the `doc_export_*` tools, `image_save`, `measure_export`,
   `comments_summarize`, the accessibility report and review record, `doc_compare_report`,
-  `form_merge_data`, the output folders of `action_run` and `ocr_recognize_files`, `sign_id_create`
-  and `sign_document`.
+  `form_merge_data`, the output folders of `action_run` and `ocr_recognize_files`, `sign_id_create`,
+  `sign_document` and `sign_clear`.
 - Read and write access are separate. Give the same folder twice for both. A root left out grants
   none of its access: with only `--automation-read-root`, nothing can be written to disk, though
   tools that give their result back instead of a path still do. Without either flag nothing changes.
@@ -108,8 +108,8 @@ running app), so the roots cover every server it starts. The desktop app is not 
 
 What the roots do not cover: tools that take no path still read and change the open documents, and
 `text_extract` and the other inspection tools return their content. Keychain and Windows
-certificate-store identities for `sign_document` are not files and are not checked. Sending a job
-to a printer is not a file write. Every path a tool reads or writes goes through
+certificate-store identities for `sign_document` and `sign_clear` are not files and are not
+checked. Sending a job to a printer is not a file write. Every path a tool reads or writes goes through
 `Automation::resolve`, and a unit test keeps the tool modules from touching the file system
 without it.
 

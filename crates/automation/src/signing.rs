@@ -1,6 +1,6 @@
 //! Signature tools: list and validate signatures, create a self-signed digital ID, sign a
-//! document, and manage trusted certificates. Rectangles are points from the top-left of the
-//! displayed page.
+//! document, clear a signature as its signer, and manage trusted certificates. Rectangles are
+//! points from the top-left of the displayed page.
 
 use pdfcraft_engine::sign::{self, Certificate, DigitalId, Modification, Name, PrivateKey};
 use pdfcraft_engine::{SignOptions, SignatureInfo, SignatureStatus};
@@ -269,6 +269,28 @@ impl Automation {
         let doc = self.doc(a)?;
         let newest = doc.signatures.iter().filter(|s| s.signed).max_by_key(|s| s.revision).cloned();
         Ok(json!({ "path": path, "bytes": signed.len(), "signature": newest.map(|s| self.sig_json(a, &s)).transpose()? }))
+    }
+
+    /// Clear a signature as its signer, proven with the digital ID that made it, and save the
+    /// file to `out` (as signing saves); the document then shows that file.
+    pub(crate) fn sign_clear(&mut self, a: &Args) -> Result<Value> {
+        let id = self.open_id(a)?;
+        let doc_id = self.doc(a)?.id;
+        let field = a.str("field")?;
+        let out = self.resolve(a.str("out")?, true)?;
+        let cleared = self.session.clear_signature(doc_id, field, &id).map_err(failed)?;
+        write_atomic(&out, &cleared.bytes)?;
+        let path = out.to_string_lossy().into_owned();
+        self.session.mark_signed(doc_id, cleared.bytes.clone(), Some(path.clone())).map_err(failed)?;
+        let signed = self.doc(a)?.signatures.iter().filter(|s| s.signed).count();
+        Ok(json!({
+            "path": path,
+            "bytes": cleared.bytes.len(),
+            "field": field,
+            "field_removed": cleared.field_removed,
+            "restored": cleared.restored,
+            "signed": signed,
+        }))
     }
 
     /// `{"image": path}` (PNG or JPEG), `{"text": name}` (typed in the script font) or

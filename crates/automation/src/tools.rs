@@ -864,6 +864,18 @@ pub fn tools() -> Vec<ToolDef> {
                 }),
                 &["doc", "id", "out"],
             )),
+        t("sign_clear", "Clear a signature", "Clear the signature in a signature field as its signer (Acrobat: Clear Signature) and save the file to `out` (clearing always saves, as signing does; the document then shows the saved file). Only the signer can: `id` is the digital ID that made the signature, as sign_document takes it (a .p12/.pfx path with its `password`, or a keychain: or windows: reference), and it must prove it holds the signer's private key; a wrong password or another person's ID is refused. Nothing of the signature is left in the file: it goes back to the revision before the signature, and everything changed since is written again without it, so earlier signatures stay valid. A field that signing added (a signature drawn on the page) is removed with it; a field that was there before stays, empty. A signature that a later signature covers is refused (clear the later one first), as is a document timestamp. Returns field_removed, restored (true when the file is now exactly as it was before signing) and how many signatures are left (signed).")
+            .destructive()
+            .with(schema(
+                json!({
+                    "doc": doc(),
+                    "field": { "type": "string", "minLength": 1, "description": "The signed field, by its full name as sign_list gives it." },
+                    "id": { "type": "string", "description": "The digital ID that made the signature: a .p12 / .pfx file, keychain: reference on macOS, or windows: reference on Windows." },
+                    "password": { "type": "string", "description": "The digital ID file's password." },
+                    "out": { "type": "string", "description": "Where to save the document without the signature." },
+                }),
+                &["doc", "field", "id", "out"],
+            )),
         t("sign_trust", "Trust certificates", "Add certificates (.cer/.crt/.pem/.der, a .p7b/.p7c bundle, or the certificates in a .p12 with `password`) to the trusted certificates used to validate signatures, or clear the list (clear: true). Every open document is revalidated. Returns the trusted list.").with(schema(
             json!({ "paths": { "type": "array", "items": { "type": "string" } }, "password": { "type": "string" }, "clear": { "type": "boolean" } }),
             &[],

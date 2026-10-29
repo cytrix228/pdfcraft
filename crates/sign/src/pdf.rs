@@ -7,6 +7,8 @@
 //! the signed one to classify changes made after signing (form fill, comments, further
 //! signatures, or anything else) under the DocMDP permissions.
 //!
+//! **Clearing** takes a signature out again, for its signer only ([`clear`]).
+//!
 //! **Signing** adds or fills a signature field, writes the document incrementally with a
 //! zero-filled `/Contents` and a fixed-width `/ByteRange`, then patches both in place: the
 //! PAdES B-B recipe (`ETSI.CAdES.detached`).
@@ -24,6 +26,7 @@ use crate::pkcs12::DigitalId;
 use crate::x509::{Certificate, build_chain, build_chain_noted};
 
 mod changes;
+mod clearing;
 mod listing;
 mod signing;
 mod types;
@@ -31,6 +34,7 @@ mod validate;
 
 #[cfg(test)]
 use changes::only_grew;
+pub use clearing::{Cleared, clear};
 #[cfg(test)]
 use listing::{DISCOVERY_CACHE_LIMIT, is_document_timestamp};
 pub use listing::{DigestCache, list, list_cached};

@@ -6453,11 +6453,11 @@ title = "Clear an unsaved signature; clear all signature fields"
 area = "H"
 tier = "P2"
 milestone = "M9"
-status = "planned"
+status = "partial"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["sign_clear"]
+evidence = ["crates/sign/tests/it/pdf/clearing.rs::clearing_the_only_signature_gives_back_the_file_as_it_was", "crates/sign/tests/it/pdf/clearing.rs::only_the_signer_can_clear_a_signature", "crates/sign/tests/it/pdf/clearing.rs::clearing_the_last_signature_keeps_later_changes_and_earlier_signatures", "crates/sign/tests/it/pdf/clearing.rs::a_certification_goes_with_its_signature", "crates/sign/tests/it/pdf/clearing.rs::document_timestamps_are_not_cleared_and_hold_back_what_they_cover", "crates/sign/tests/it/pdf/clearing.rs::a_signature_in_the_first_revision_is_cleared_with_a_full_write", "crates/sign/tests/it/pdf/clearing.rs::the_signatures_entry_in_the_security_store_goes_with_it", "crates/sign/tests/it/pdf/clearing.rs::encrypted_documents_are_cleared_only_as_their_permissions_allow", "crates/automation/tests/it/automation.rs::a_signature_is_cleared_only_by_its_signer_with_the_ids_password"]
+notes = "sign_clear clears one signature for its signer only, as Acrobat allows: the digital ID that signed must open with its password (a .p12) and sign a fresh challenge the signer's certificate verifies; another person's ID, or a copy of the signer's certificate with another key, is refused. Nothing of the signature is left: the file is cut back to the revision before it and everything changed since is written again as one update, so earlier signatures stay valid, and a file nothing else changed is given back byte for byte. A field signing added goes with it, an existing one stays empty with its earlier appearance; the DocMDP certification and the /DSS /VRI entry go too. A signature under a later one (or a document timestamp) is refused until that is cleared; protected documents follow their permissions. This is a guard against mistakes, not a lock: anyone with the file can cut a revision off. Missing: the Signatures panel's Clear Signature button and ID prompt, Clear All Signature Fields, clearing an unsaved signature in place, and an Acrobat comparison of the result"
 
 [[feature]]
 id = "sign.seed-values"

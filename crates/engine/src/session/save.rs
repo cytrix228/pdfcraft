@@ -324,8 +324,26 @@ impl Session {
         Ok(embedded)
     }
 
+    /// Clear the signature in `field` as its signer (Signatures panel ▸ Clear Signature): `id` is
+    /// the digital ID that made it and must prove it holds the signer's key. The file goes back
+    /// to the revision before the signature, with every later change written again without it
+    /// ([`pdfcraft_sign::clear_signature`]). Returns the file to save; the caller saves it and
+    /// then calls [`Session::mark_signed`], which drops the edit history as signing does.
+    pub fn clear_signature(&self, doc: DocId, field: &str, id: &pdfcraft_sign::DigitalId) -> Result<pdfcraft_sign::Cleared, EditError> {
+        let d = self.get(doc).ok_or(EditError::NoDocument)?;
+        let editor = d.editor.as_ref().ok_or_else(|| EditError::ReadOnly(d.read_only_reason.clone().unwrap_or_default()))?;
+        let date = self.now().map(pdfcraft_cos::pdf_date);
+        // A typed Password-field value is not written into the file (#3926), as it isn't saved.
+        let cos = writable(&editor.cos)?;
+        let cleared = guard(|| pdfcraft_sign::clear_signature(&cos, field, id, date.as_deref())).map_err(EditError::Write)??;
+        // Checked like a save before anyone writes it (#2166).
+        self.check_save(doc, &cleared.bytes)?;
+        Ok(cleared)
+    }
+
     /// Record that the signed file `bytes` was saved (to `path`): like [`Session::mark_saved`],
-    /// and the edit history before signing is dropped (signing can't be undone).
+    /// and the edit history before signing is dropped (signing can't be undone). Also after
+    /// [`Session::clear_signature`]: the states before it hold the signature.
     pub fn mark_signed(&mut self, id: DocId, bytes: Arc<Vec<u8>>, path: Option<String>) -> Result<(), EditError> {
         self.mark_saved(id, bytes, path)?;
         let doc = self.doc_mut(id)?;

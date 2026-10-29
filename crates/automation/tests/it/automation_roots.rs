@@ -165,6 +165,7 @@ fn tools_that_read_a_path_are_held_to_the_read_root() {
         ("ocr_recognize_files", json!({"paths": [secret], "folder": s(&base.join("out/ocr"))})),
         ("sign_trust", json!({"paths": [secret]})),
         ("sign_document", json!({"doc": 1, "id": secret, "out": out})),
+        ("sign_clear", json!({"doc": 1, "field": "Signature1", "id": secret, "out": out})),
         ("text_font_import", json!({"doc": 1, "page": 1, "path": gone})),
         ("text_font_files", json!({"directories": [s(&base.join("outside"))]})),
     ] {
@@ -294,6 +295,10 @@ fn signing_writes_and_reads_only_inside_the_roots() {
     );
     ok(&mut server, "sign_document", json!({"doc": 1, "id": s(&work.join("id.p12")), "password": "secret12", "out": s(&work.join("signed.pdf"))}));
     assert!(work.join("signed.pdf").is_file());
+    let clear = |out: &Path| json!({"doc": 1, "field": "Signature1", "id": s(&work.join("id.p12")), "password": "secret12", "out": s(out)});
+    refused(&mut server, "sign_clear", clear(&base.join("outside/cleared.pdf")), "outside the write root");
+    ok(&mut server, "sign_clear", clear(&work.join("cleared.pdf")));
+    assert!(work.join("cleared.pdf").is_file());
     assert_eq!(names(&base.join("outside")), ["pic.png", "secret.pdf"]);
 }
 

@@ -223,8 +223,9 @@ fn empty_dir(dir: &Path) {
 /// Real values for the arguments a tool checks before the others, so a hostile value reaches the
 /// argument it is meant for instead of failing on a placeholder. `sign_document` checks its
 /// digital ID first and its document second: this ID opens with its password, and each call gets
-/// a fresh document (which the caller closes), since a successful call signs it. The ID is a test
-/// key with a low key derivation count, so the hundreds of calls that open it stay fast.
+/// a fresh document (which the caller closes), since a successful call signs it. `sign_clear` gets
+/// the same ID and a document signed with it, so a hostile `out` reaches the path checks. The ID is
+/// a test key with a low key derivation count, so the hundreds of calls that open it stay fast.
 fn fixture(a: &mut Automation, root: &Path, tool: &str) -> serde_json::Map<String, Value> {
     match tool {
         "sign_document" => {
@@ -232,6 +233,16 @@ fn fixture(a: &mut Automation, root: &Path, tool: &str) -> serde_json::Map<Strin
             std::fs::copy(&id, root.join("id.p12")).expect("copy the test digital ID");
             let doc = blank_doc(a);
             let args = json!({ "doc": doc, "id": "id.p12", "password": "test", "out": "signed.pdf" });
+            args.as_object().cloned().unwrap_or_default()
+        }
+        // Signed with the same ID first, so a call gets past the ID, the document and the field.
+        // Every argument is needed, so no call with a hostile value clears anything.
+        "sign_clear" => {
+            let id = Path::new(env!("CARGO_MANIFEST_DIR")).join("../sign/tests/data/ec-p256.p12");
+            std::fs::copy(&id, root.join("id.p12")).expect("copy the test digital ID");
+            let doc = blank_doc(a);
+            a.call("sign_document", &json!({ "doc": doc, "id": "id.p12", "password": "test", "out": "signed.pdf" })).expect("sign the fixture");
+            let args = json!({ "doc": doc, "id": "id.p12", "password": "test", "field": "Signature1", "out": "cleared.pdf" });
             args.as_object().cloned().unwrap_or_default()
         }
         _ => serde_json::Map::new(),

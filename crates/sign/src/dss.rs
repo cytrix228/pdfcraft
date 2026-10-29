@@ -20,7 +20,7 @@ pub struct Evidence {
 }
 
 /// Uppercase-hex SHA-1 of a signature's `/Contents` — the `/VRI` key convention.
-fn vri_key(contents: &[u8]) -> String {
+pub(crate) fn vri_key(contents: &[u8]) -> String {
     crate::keys::DigestAlg::Sha1.digest(&[contents]).iter().map(|b| format!("{b:02X}")).collect()
 }
 
