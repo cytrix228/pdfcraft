@@ -1,5 +1,6 @@
 # PdfCraft roadmap
 
+> **Last reviewed:** 2026-11-05 | **Last updated:** 2026-11-05 | **Change:** minor (M9: Clear Signature button in the Signatures panel; estimates unchanged)
 > **Last reviewed:** 2026-11-03 | **Last updated:** 2026-11-03 | **Change:** patch (M5 #5850 review: indirect typewriter intent and composer edits preserve outer whitespace; movement regression commits by outside click; estimates unchanged)
 
 > **Last reviewed:** 2026-11-03 | **Last updated:** 2026-11-03 | **Change:** patch (M5 #5850: Enter adds Fill & Sign line breaks; outside clicks commit, Escape cancels, and saved multiline appearances retain their text and height; estimates unchanged)
@@ -224,6 +225,7 @@ Ranked; detail and the full milestone table in [docs/roadmap.md](docs/roadmap.md
 
 ## Progress log
 
+- **2026-11-05 (M9, Clear Signature button):** The Signatures panel offers Clear Signature… on each signature: the dialog lists the digital IDs (the one named like the signer first) and asks for the ID's password; a wrong password or another person's ID is said there, before anything is saved, and the file is then saved under the document's name without the signature. The button is disabled, with the reason, on a signature a later one covers. The dialog's strings are English until craft-i18n translates them. Estimates unchanged.
 - **2026-11-03 (M11, shared JBIG2 dictionary):** With Monochrome Images set to JBIG2, Optimize has up to 16 JBIG2 images share one symbol dictionary (`/JBIG2Globals`), the letters found on more than one page stored once, when that is smaller (`pdfcraft_filters::encode_jbig2_shared`). Eight pages of 10 pt text rendered at 300 dpi take 41% less in Helvetica and 42% in Times than coded alone, 10% in Courier; groups of 16 save 45%, of 32 only 47%. Only images redaction can store again without the dictionary share one (image masks and DeviceGray named directly, at most 64 Mi pixels), and redacting one stores the rest of its group so, which the group bounds to 15.
 
 - **2026-10-29 (M9, Clear Signature):** `sign_clear` clears one signature for its signer: the digital ID must open with its password and sign a fresh challenge the signer's certificate verifies, so another person's ID or a copied certificate is refused. The file is cut back to the revision before the signature and everything changed since is written again without it: no byte of the signature remains, earlier signatures stay valid, and a file nothing else changed comes back byte for byte. A signature under a later one waits for that one. The Signatures panel's button and Clear All Signature Fields are still missing. Estimates unchanged.
@@ -763,6 +765,7 @@ Newest first: the date, what moved, and the new overall estimate.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-05 | minor | M9: Signatures panel ▸ Clear Signature… asks for the signer's digital ID and its password and saves the document without the signature (disabled on one a later signature covers). Estimates unchanged. |
 | 2026-10-29 | minor | M9: `sign_clear` clears a signature for its signer only (the digital ID's password opens it, and it proves the signer's key); the file goes back to the revision before the signature with later changes kept, so nothing of it remains and earlier signatures stay valid. No Signatures-panel button yet. Estimates unchanged. |
 | 2026-11-03 | patch | M5 #5850 review: indirect typewriter intent and composer edits preserve outer whitespace; movement regression commits by outside click; estimates unchanged. |
 | 2026-11-03 | patch | M5 #5850: Enter adds Fill & Sign line breaks; outside clicks commit, Escape cancels, and saved multiline appearances retain their text and height; estimates unchanged. |

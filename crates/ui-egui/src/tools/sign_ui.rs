@@ -16,9 +16,12 @@ use crate::page_cursor::Layer;
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, icons, widgets};
 
+mod clear;
 mod dialog;
 mod panel;
 
+pub use clear::ClearDraft;
+pub(crate) use clear::clear_dialog;
 #[cfg(test)]
 use dialog::detail_lines;
 use dialog::graphic_of;
@@ -258,6 +261,22 @@ fn windows_id(reference: &str) -> Result<DigitalId, String> {
     Err(format!("{reference}: Windows certificate store identities are only available on Windows"))
 }
 
+/// The digital ID `entry` names, opened: a Keychain or Windows store identity, or a file with
+/// `password`.
+fn open_id(entry: &DigitalIdEntry, password: &str) -> Result<DigitalId, String> {
+    if entry.path.starts_with("keychain:") {
+        return keychain_id(&entry.path);
+    }
+    if entry.path.starts_with("windows:") {
+        return windows_id(&entry.path);
+    }
+    let bytes = std::fs::read(&entry.path).map_err(|e| format!("{}: {e}", entry.path))?;
+    sign::pkcs12::open(&bytes, password).map_err(|e| match e {
+        sign::SignError::WrongPassword => "The password is incorrect.".to_string(),
+        e => e.to_string(),
+    })
+}
+
 pub fn entry_for(path: &str, c: &Certificate) -> DigitalIdEntry {
     DigitalIdEntry {
         path: path.to_string(),
@@ -433,17 +452,7 @@ impl PdfCraftApp {
         let Some((_, doc_id)) = self.active_ids() else { return Err("no document".into()) };
         let d = self.sign_draft.clone().ok_or("nothing to sign")?;
         let entry = d.selected.and_then(|i| self.digital_ids.get(i)).filter(|e| e.unusable.is_none()).cloned().ok_or("Choose a digital ID.")?;
-        let id = if entry.path.starts_with("keychain:") {
-            keychain_id(&entry.path)?
-        } else if entry.path.starts_with("windows:") {
-            windows_id(&entry.path)?
-        } else {
-            let bytes = std::fs::read(&entry.path).map_err(|e| format!("{}: {e}", entry.path))?;
-            sign::pkcs12::open(&bytes, &d.password).map_err(|e| match e {
-                sign::SignError::WrongPassword => "The password is incorrect.".to_string(),
-                e => e.to_string(),
-            })?
-        };
+        let id = open_id(&entry, &d.password)?;
         let some = |s: &str| (!s.trim().is_empty()).then(|| s.trim().to_string());
         // Only a visible signature shows its graphic.
         let graphic = match self.graphic_sig(&d.graphic) {

@@ -186,6 +186,8 @@ pub enum Dialog {
     AuditSpace,
     /// Signatures ▸ Show certificate.
     CertificateViewer,
+    /// Signatures ▸ Clear Signature: the signer's digital ID and its password.
+    ClearSignature,
     /// Pin tools to Home: selection modal.
     PinTool,
 }

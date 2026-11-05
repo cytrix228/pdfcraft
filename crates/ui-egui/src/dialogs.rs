@@ -275,6 +275,13 @@ fn dialog_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, dialog: Dialog, req: &m
             }
             return false;
         }
+        Dialog::ClearSignature => {
+            if crate::sign_ui::clear_dialog(ui, app, &t) {
+                app.clear_draft = None;
+                req.close = true;
+            }
+            return false;
+        }
         Dialog::SummarizeComments => {
             if !dialog_summarize_comments(ui, app, req) {
                 return false;

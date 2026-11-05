@@ -413,6 +413,7 @@ pub fn right_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         Some(crate::sign_ui::PanelAction::ExportCertificate(c)) => {
             app.export_certificate(&c);
         }
+        Some(crate::sign_ui::PanelAction::Clear { field, signer }) => app.start_clearing(field, signer),
         None => {}
     }
     if let Some((p, i)) = app.views.get_mut(index).and_then(|v| v.comments.default_request.take()) {

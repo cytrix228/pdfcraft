@@ -1,6 +1,6 @@
 use super::{
-    Align, Appearance, AppearanceLabels, Color32, CornerRadius, KEY_ALGORITHMS, Layout, NewIdDraft, PdfCraftApp, Rect, SavedSig, SignGraphic,
-    SignStep, Stroke, Tokens, icons, sign, theme, vec2, widgets,
+    Align, Appearance, AppearanceLabels, Color32, CornerRadius, DigitalIdEntry, KEY_ALGORITHMS, Layout, NewIdDraft, PdfCraftApp, Rect, SavedSig,
+    SignGraphic, SignStep, Stroke, Tokens, icons, sign, theme, vec2, widgets,
 };
 #[cfg(not(target_arch = "wasm32"))]
 use crate::file_filter::AddFilterAnyCase as _;
@@ -22,11 +22,80 @@ pub(super) fn title(ui: &mut egui::Ui, text: &str) {
     ui.add_space(8.0);
 }
 
-fn error(ui: &mut egui::Ui, err: &Option<String>) {
+pub(super) fn error(ui: &mut egui::Ui, err: &Option<String>) {
     if let Some(e) = err.as_ref().filter(|e| !e.is_empty()) {
         ui.colored_label(Color32::from_rgb(0xD7, 0x37, 0x3F), tl!(e));
         ui.add_space(4.0);
     }
+}
+
+/// The digital IDs as rows to choose one from, an unusable one greyed with its reason where the
+/// issuer would be. Returns whether a usable row was clicked (it is then `selected`) and whether
+/// one was double-clicked.
+pub(super) fn id_rows(ui: &mut egui::Ui, ids: &[DigitalIdEntry], selected: &mut Option<usize>, t: &Tokens) -> (bool, bool) {
+    let (mut clicked, mut double) = (false, false);
+    for (i, e) in ids.iter().enumerate() {
+        let is_selected = *selected == Some(i);
+        let usable = e.unusable.is_none();
+        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 52.0), egui::Sense::click());
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, usable, is_selected, &e.name));
+        let fill = if is_selected {
+            t.accent_soft
+        } else if resp.hovered() && usable {
+            t.hover
+        } else {
+            Color32::TRANSPARENT
+        };
+        ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
+        // An unusable ID is greyed, with the reason where the issuer would be.
+        let (icon, name_color) = if usable { (t.accent, t.text) } else { (t.text_muted, t.text_muted) };
+        icons::paint(ui, Rect::from_min_size(rect.min + vec2(10.0, 15.0), vec2(20.0, 20.0)), "badge-check", 18.0, icon);
+        // Certificate names can be any length: cut both lines with "…" at the row's edge
+        // and show them whole on hover.
+        let line = |text: &str, font: egui::FontId, color: Color32| {
+            let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
+            job.wrap = egui::text::TextWrapping::truncate_at_width((rect.width() - 50.0).max(0.0));
+            ui.painter().layout_job(job)
+        };
+        let name = line(&e.name, theme::semibold(13.0), name_color);
+        let store = if e.path.starts_with("keychain:") {
+            tl!("Keychain  ·  ").to_string()
+        } else if e.path.starts_with("windows:") {
+            tl!("Windows store  ·  ").to_string()
+        } else {
+            String::new()
+        };
+        let sub = match &e.unusable {
+            Some(reason) => format!("{store}{reason}"),
+            None => format!(
+                "{store}{email}{issued}{issuer}{expires}{date}",
+                email = if e.email.is_empty() { String::new() } else { format!("{}  ·  ", e.email) },
+                issued = tl!("Issued by: "),
+                issuer = e.issuer,
+                expires = tl!(", Expires: "),
+                date = e.expires,
+            ),
+        };
+        let details = line(&sub, theme::regular(11.5), t.text_muted);
+        let elided = name.elided || details.elided;
+        ui.painter().galley(rect.min + vec2(40.0, 9.0), name, name_color);
+        ui.painter().galley(rect.min + vec2(40.0, 28.0), details, t.text_muted);
+        let resp = if elided { resp.on_hover_text(format!("{}\n{sub}", e.name)) } else { resp };
+        if !usable {
+            continue;
+        }
+        if resp.clicked() {
+            *selected = Some(i);
+            clicked = true;
+        }
+        if resp.double_clicked() {
+            double = true;
+        }
+    }
+    if ids.is_empty() {
+        ui.label(egui::RichText::new(tl!("No digital IDs yet.")).color(t.text_muted));
+    }
+    (clicked, double)
 }
 
 /// Draw the digital-ID chooser, including unusable certificates and removal confirmation.
@@ -38,66 +107,12 @@ fn choose(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
     let Some(d) = app.sign_draft.as_mut() else { return true };
     let mut close = false;
     egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
-        for (i, e) in ids.iter().enumerate() {
-            let selected = d.selected == Some(i);
-            let usable = e.unusable.is_none();
-            let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 52.0), egui::Sense::click());
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, usable, selected, &e.name));
-            let fill = if selected {
-                t.accent_soft
-            } else if resp.hovered() && usable {
-                t.hover
-            } else {
-                Color32::TRANSPARENT
-            };
-            ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
-            // An unusable ID is greyed, with the reason where the issuer would be.
-            let (icon, name_color) = if usable { (t.accent, t.text) } else { (t.text_muted, t.text_muted) };
-            icons::paint(ui, Rect::from_min_size(rect.min + vec2(10.0, 15.0), vec2(20.0, 20.0)), "badge-check", 18.0, icon);
-            // Certificate names can be any length: cut both lines with "…" at the row's edge
-            // and show them whole on hover.
-            let line = |text: &str, font: egui::FontId, color: Color32| {
-                let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
-                job.wrap = egui::text::TextWrapping::truncate_at_width((rect.width() - 50.0).max(0.0));
-                ui.painter().layout_job(job)
-            };
-            let name = line(&e.name, theme::semibold(13.0), name_color);
-            let store = if e.path.starts_with("keychain:") {
-                tl!("Keychain  ·  ").to_string()
-            } else if e.path.starts_with("windows:") {
-                tl!("Windows store  ·  ").to_string()
-            } else {
-                String::new()
-            };
-            let sub = match &e.unusable {
-                Some(reason) => format!("{store}{reason}"),
-                None => format!(
-                    "{store}{email}{issued}{issuer}{expires}{date}",
-                    email = if e.email.is_empty() { String::new() } else { format!("{}  ·  ", e.email) },
-                    issued = tl!("Issued by: "),
-                    issuer = e.issuer,
-                    expires = tl!(", Expires: "),
-                    date = e.expires,
-                ),
-            };
-            let details = line(&sub, theme::regular(11.5), t.text_muted);
-            let elided = name.elided || details.elided;
-            ui.painter().galley(rect.min + vec2(40.0, 9.0), name, name_color);
-            ui.painter().galley(rect.min + vec2(40.0, 28.0), details, t.text_muted);
-            let resp = if elided { resp.on_hover_text(format!("{}\n{sub}", e.name)) } else { resp };
-            if !usable {
-                continue;
-            }
-            if resp.clicked() {
-                d.selected = Some(i);
-                d.confirm_remove = None;
-            }
-            if resp.double_clicked() {
-                d.step = SignStep::SignAs;
-            }
+        let (clicked, double) = id_rows(ui, &ids, &mut d.selected, t);
+        if clicked {
+            d.confirm_remove = None;
         }
-        if ids.is_empty() {
-            ui.label(egui::RichText::new(tl!("No digital IDs yet.")).color(t.text_muted));
+        if double {
+            d.step = SignStep::SignAs;
         }
     });
     ui.add_space(10.0);

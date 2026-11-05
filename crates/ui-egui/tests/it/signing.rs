@@ -769,3 +769,79 @@ fn signing_preserves_destination_opening_attributes() {
     assert_eq!(xattr::get(&dest, "com.apple.quarantine").unwrap(), Some(b"0082;1234;Preview;".to_vec()));
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// Sign `h`'s document invisibly with the digital ID at `id` in the list (password "test").
+fn sign_invisibly(h: &mut Harness<'static, PdfCraftApp>, id: usize) {
+    h.state_mut().start_signing(0, None, None, None);
+    {
+        let d = h.state_mut().sign_draft.as_mut().unwrap();
+        d.selected = Some(id);
+        d.step = SignStep::SignAs;
+        d.password = "test".into();
+    }
+    h.run_steps(2);
+    support::outside_menus(h, "Sign").click();
+    h.run_steps(6);
+    assert_eq!(h.state().dialog, None, "{:?}", h.state().sign_draft.as_ref().and_then(|d| d.error.clone()));
+}
+
+/// Signatures panel ▸ Clear Signature: only the digital ID that signed, opened with its
+/// password, clears a signature, and the saved file is the document as it was before it. A
+/// signature that a later one covers waits for that one.
+#[test]
+fn the_signer_clears_a_signature_from_the_signatures_panel() {
+    let dir = dir().join("clear");
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut h = harness(dir.clone());
+    let data = concat!(env!("CARGO_MANIFEST_DIR"), "/../sign/tests/data/");
+    // Someone else's ID first, so the signer's is found by name.
+    for file in ["rsa-aes.p12", "ec-p256.p12"] {
+        let path = format!("{data}{file}");
+        let id = pdfcraft_engine::sign::pkcs12::open(&std::fs::read(&path).unwrap(), "test").unwrap();
+        h.state_mut().add_digital_id(&path, &id.certificate);
+    }
+    let saved = dir.join("contract_signed.pdf");
+    sign_invisibly(&mut h, 1);
+    let once = std::fs::read(&saved).unwrap();
+    sign_invisibly(&mut h, 1);
+    assert_eq!(h.state().right, Some(RightPanel::Signatures));
+
+    // The first signature is under the second: its button waits.
+    h.state_mut().sig_expanded = vec!["Signature1".into()];
+    h.run_steps(2);
+    assert!(h.get_by_label("Clear Signature…").accesskit_node().is_disabled(), "a later signature covers the first");
+    h.state_mut().sig_expanded = vec!["Signature2".into()];
+    h.run_steps(2);
+    h.get_by_label("Clear Signature…").click();
+    h.run_steps(3);
+    assert_eq!(h.state().dialog, Some(Dialog::ClearSignature));
+    assert_eq!(h.state().clear_draft.as_ref().and_then(|d| d.selected), Some(1), "the ID named like the signer is chosen");
+    h.get_by_label_contains("Choose the digital ID that Test Signer EC signed with");
+
+    let clear_with = |h: &mut Harness<'static, PdfCraftApp>, id: usize, password: &str| {
+        {
+            let d = h.state_mut().clear_draft.as_mut().unwrap();
+            d.selected = Some(id);
+            d.password = password.into();
+        }
+        h.run_steps(1);
+        support::outside_menus(h, "Clear").click();
+        h.run_steps(6);
+    };
+    // Another person's ID, opened with its own password, is not the signer's.
+    clear_with(&mut h, 0, "test");
+    h.get_by_label("This digital ID did not make the signature: only its signer can clear it.");
+    // The signer's ID needs its password.
+    clear_with(&mut h, 1, "nope");
+    h.get_by_label("The password is incorrect.");
+    assert!(std::fs::read(&saved).unwrap().len() > once.len(), "nothing was saved while refused");
+
+    clear_with(&mut h, 1, "test");
+    let s = h.state();
+    assert_eq!(s.dialog, None, "{:?}", s.clear_draft.as_ref().and_then(|d| d.error.clone()));
+    let doc = s.session.get(s.views[0].id).unwrap();
+    let left: Vec<(&str, bool)> = doc.signatures.iter().map(|x| (x.field.as_str(), x.signed)).collect();
+    assert_eq!(left, [("Signature1", true)], "the second signature and the field it drew are gone");
+    assert!(std::fs::read(&saved).unwrap() == once, "the file as it was before the second signature");
+    h.get_by_label_contains("Signed by Test Signer EC");
+}

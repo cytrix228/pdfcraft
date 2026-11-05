@@ -65,6 +65,11 @@ pub enum PanelAction {
     ExportCertificate(Box<Certificate>),
     /// Certificate Viewer for the signer's chain (signer first).
     ViewCertificate(Vec<Certificate>),
+    /// Clear Signature: the signer proves it is theirs with their digital ID (named for the dialog).
+    Clear {
+        field: String,
+        signer: String,
+    },
 }
 
 /// The Signatures panel body.
@@ -206,6 +211,19 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, sigs: &[SignatureInfo], expan
                     && ui.button(tl!("Export certificate…")).clicked()
                 {
                     action = Some(PanelAction::ExportCertificate(Box::new(c.clone())));
+                }
+                // A document timestamp has no signer to clear it. A signature that a later one
+                // covers waits for that one, which would otherwise no longer cover the file.
+                if !s.doc_timestamp {
+                    let later = sigs.iter().any(|o| o.signed && o.signed_len > s.signed_len);
+                    // One line: the row moves it down when it doesn't fit beside the button before it.
+                    let button = egui::Button::new(tl!("Clear Signature…")).wrap_mode(egui::TextWrapMode::Extend);
+                    let clear = ui.add_enabled(!later, button);
+                    let clear =
+                        if later { clear.on_disabled_hover_text(tl!("A later signature covers this one. Clear that one first.")) } else { clear };
+                    if clear.clicked() {
+                        action = Some(PanelAction::Clear { field: s.field.clone(), signer: s.signer.clone().unwrap_or_default() });
+                    }
                 }
             });
         });
